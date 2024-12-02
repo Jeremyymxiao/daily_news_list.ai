@@ -6,10 +6,10 @@ export interface Keyword {
 
 export interface NewsItem {
   title: string;
-  summary: string;
   url: string;
   date: string;
-  source: string;
+  source?: string;
+  summary: string;
 }
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

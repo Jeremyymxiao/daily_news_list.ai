@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Keyword, NewsItem } from '@/types';
 import { KeywordInput } from '@/components/KeywordInput';
 import { NewsList } from '@/components/NewsList';
 import { Settings } from '@/components/Settings';
 import { searchNews, formatNewsToReport } from '@/lib/kimi';
 import ReactMarkdown from 'react-markdown';
+import { cn } from '@/lib/utils';
 
 export default function Home() {
   const [language, setLanguage] = useState<'zh' | 'en'>('zh');
@@ -16,6 +17,38 @@ export default function Home() {
   const [activeKeywords, setActiveKeywords] = useState<string[]>([]);
   const [error, setError] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  // 模拟进度更新
+  useEffect(() => {
+    if (isGenerating) {
+      setProgress(0);
+      const timer = setInterval(() => {
+        setProgress(prev => {
+          // 根据当前进度调整增长速度
+          if (prev < 30) {
+            // 初始阶段，较快速度
+            return prev + Math.random() * 8;
+          } else if (prev < 60) {
+            // 中期阶段，中等速度
+            return prev + Math.random() * 5;
+          } else if (prev < 75) {
+            // 后期阶段，较慢速度
+            return prev + Math.random() * 3;
+          } else if (prev >= 75) {
+            clearInterval(timer);
+            return 75; // 最大进度限制在75%
+          }
+          return prev;
+        });
+      }, 800); // 增加间隔时间
+
+      return () => {
+        clearInterval(timer);
+        setProgress(0);
+      };
+    }
+  }, [isGenerating]);
 
   const handleGenerate = async (keywords: Keyword[]) => {
     setIsGenerating(true);
@@ -27,8 +60,9 @@ export default function Home() {
       const selectedKeywords = keywords.filter(k => k.selected).map(k => k.text);
       setActiveKeywords(selectedKeywords);
 
-      // 计算每个关键词应该获取的新闻数量
-      const newsPerKeyword = Math.max(1, Math.floor(5 / selectedKeywords.length));
+      // 设置目标新闻总数和每个关键词的新闻数量
+      const TARGET_NEWS_COUNT = 10;
+      const newsPerKeyword = Math.max(2, Math.ceil(TARGET_NEWS_COUNT / selectedKeywords.length));
       
       // 并行获取所有关键词的新闻
       const allNewsPromises = selectedKeywords.map(keyword =>
@@ -48,11 +82,24 @@ export default function Home() {
         return;
       }
 
+      // 如果新闻数量不足，显示提示
+      if (allNews.length < TARGET_NEWS_COUNT) {
+        setError(
+          language === 'zh'
+            ? `当前仅找到 ${allNews.length} 条新闻，建议添加更多关键词以获取更多相关新闻`
+            : `Only ${allNews.length} news found. Consider adding more keywords for more relevant news`
+        );
+      } else {
+        setError(''); // 清除错误提示
+      }
+
       setNews(allNews);
+      setProgress(85);
 
       // 生成日报格式
       const formattedReport = await formatNewsToReport(allNews, selectedKeywords, language);
       setReport(formattedReport);
+      setProgress(100);
     } catch (error) {
       console.error('Error generating news:', error);
       setError(
@@ -76,22 +123,22 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+    <div className="min-h-screen bg-background">
       <Settings language={language} onLanguageChange={setLanguage} />
       
-      <main className="container mx-auto px-4 py-12 space-y-12 max-w-5xl">
-        <div className="text-center space-y-6">
-          <h1 className="text-5xl font-bold text-black tracking-tight">
+      <main className="container py-6 sm:py-12 space-y-8 sm:space-y-12">
+        <div className="text-center space-y-4 sm:space-y-6">
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
             {language === 'zh' ? '每日新闻助手' : 'Daily News Assistant'}
           </h1>
-          <p className="text-xl text-black max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
             {language === 'zh' 
               ? '输入关键词，获取今日相关新闻' 
               : 'Enter keywords to get relevant news of the day'}
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-8">
+        <div className="card">
           <KeywordInput
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
@@ -99,60 +146,78 @@ export default function Home() {
         </div>
 
         {error && (
-          <div className="text-center text-red-600 bg-red-50 rounded-lg p-4 font-medium">
+          <div className="bg-destructive/10 text-destructive rounded-lg p-4 text-sm sm:text-base font-medium text-center">
             {error}
           </div>
         )}
 
-        {report && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
-            <div className="border-b border-gray-200 p-6 bg-gray-50">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-black">
+        {isGenerating && (
+          <div className="card space-y-6">
+            <div className="max-w-2xl mx-auto space-y-4">
+              <div className="text-center space-y-2">
+                <h3 className="text-xl font-semibold">
+                  {language === 'zh' ? '正在生成新闻日报' : 'Generating News Report'}
+                </h3>
+                <p className="text-muted-foreground">
+                  {language === 'zh' 
+                    ? '正在搜索和整理相关新闻，请稍候...' 
+                    : 'Searching and organizing relevant news, please wait...'}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-300 rounded-full"
+                    style={{ width: `${Math.min(100, progress)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>{Math.round(progress)}%</span>
+                  <span>{language === 'zh' ? '预计需要15-30秒' : 'ETA: 15-30 seconds'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {report && !isGenerating && (
+          <div className="card overflow-hidden">
+            <div className="border-b p-4 sm:p-6 bg-muted">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <h2 className="text-2xl font-bold">
                   {language === 'zh' ? '今日新闻日报' : 'Daily News Report'}
                 </h2>
                 <button
                   onClick={handleCopy}
-                  className="px-6 py-2.5 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2"
+                  className={cn(
+                    "button button-primary w-full sm:w-auto",
+                    copied && "bg-green-600 hover:bg-green-700"
+                  )}
                 >
                   {copied ? (
                     <>
-                      <CheckIcon className="w-4 h-4" />
+                      <CheckIcon className="w-4 h-4 mr-2" />
                       {language === 'zh' ? '已复制' : 'Copied'}
                     </>
                   ) : (
                     <>
-                      <CopyIcon className="w-4 h-4" />
+                      <CopyIcon className="w-4 h-4 mr-2" />
                       {language === 'zh' ? '复制全文' : 'Copy'}
                     </>
                   )}
                 </button>
               </div>
             </div>
-            <div className="p-8">
-              <div className="prose prose-lg max-w-none 
-                prose-headings:text-black prose-headings:font-bold 
-                prose-h1:text-3xl prose-h1:mb-8
-                prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4
-                prose-h3:text-xl prose-h3:mt-6 prose-h3:mb-3
-                prose-p:text-black prose-p:leading-relaxed prose-p:my-4
-                prose-strong:text-black prose-strong:font-bold
-                prose-a:text-blue-700 prose-a:no-underline hover:prose-a:underline
-                prose-ul:text-black prose-ol:text-black
-                prose-li:text-black prose-li:my-1
-                prose-blockquote:text-black prose-blockquote:border-l-4 prose-blockquote:border-black/20 prose-blockquote:pl-4 prose-blockquote:py-1
-                prose-hr:border-gray-300
-                [&>*:first-child]:mt-0 [&>*:last-child]:mb-0
-                [&_p]:text-black [&_li]:text-black [&_strong]:text-black
-                text-black"
-              >
+            <div className="p-4 sm:p-8">
+              <div className="prose prose-lg max-w-none">
                 <ReactMarkdown>{report}</ReactMarkdown>
               </div>
             </div>
           </div>
         )}
 
-        {news.length > 0 && !report && (
+        {news.length > 0 && !report && !isGenerating && (
           <NewsList
             news={news}
             keywords={activeKeywords}

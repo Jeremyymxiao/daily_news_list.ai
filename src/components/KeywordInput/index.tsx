@@ -1,114 +1,129 @@
-import { useState, useCallback } from 'react';
-import { Keyword } from '@/types';
-import { Input } from '../ui/Input';
-import { Button } from '../ui/Button';
-import { KeywordTag } from './KeywordTag';
+'use client';
 
-interface KeywordInputProps {
+import { useState, useRef, useEffect } from 'react';
+import { KeywordTag } from './KeywordTag';
+import { Keyword } from '@/types';
+import { cn } from '@/lib/utils';
+
+interface Props {
   onGenerate: (keywords: Keyword[]) => void;
-  isGenerating?: boolean;
+  isGenerating: boolean;
 }
 
-export const KeywordInput = ({ onGenerate, isGenerating = false }: KeywordInputProps) => {
-  const [input, setInput] = useState('');
+export function KeywordInput({ onGenerate, isGenerating }: Props) {
   const [keywords, setKeywords] = useState<Keyword[]>([]);
-  const [error, setError] = useState('');
+  const [inputValue, setInputValue] = useState('');
+  const [isComposing, setIsComposing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-    setError('');
+    setInputValue(e.target.value);
   };
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
+    if (isComposing) return;
+
+    if ((e.key === 'Enter' || e.key === ',' || e.key === ' ') && inputValue.trim()) {
       e.preventDefault();
-      addKeyword();
+      const text = inputValue.trim().replace(/,$/, '');
+      if (text) {
+        addKeyword(text);
+      }
+    } else if (e.key === 'Backspace' && !inputValue) {
+      e.preventDefault();
+      removeLastKeyword();
     }
   };
 
-  const addKeyword = useCallback(() => {
-    const trimmedInput = input.trim().replace(/,+$/, '');
-    if (!trimmedInput) return;
-
+  const addKeyword = (text: string) => {
     if (keywords.length >= 10) {
-      setError('最多只能添加10个关键词');
       return;
     }
-
-    if (keywords.some(k => k.text.toLowerCase() === trimmedInput.toLowerCase())) {
-      setError('该关键词已存在');
-      return;
+    if (!keywords.find(k => k.text === text)) {
+      setKeywords([...keywords, { id: Date.now().toString(), text, selected: true }]);
     }
+    setInputValue('');
+  };
 
-    const newKeyword: Keyword = {
-      id: Date.now().toString(),
-      text: trimmedInput,
-      selected: true
-    };
+  const removeKeyword = (text: string) => {
+    setKeywords(keywords.filter(k => k.text !== text));
+  };
 
-    setKeywords(prev => [...prev, newKeyword]);
-    setInput('');
-    setError('');
-  }, [input, keywords]);
+  const removeLastKeyword = () => {
+    if (keywords.length > 0) {
+      setKeywords(keywords.slice(0, -1));
+    }
+  };
 
-  const toggleKeyword = (id: string) => {
-    setKeywords(prev =>
-      prev.map(k =>
-        k.id === id ? { ...k, selected: !k.selected } : k
+  const toggleKeyword = (text: string) => {
+    setKeywords(
+      keywords.map(k =>
+        k.text === text ? { ...k, selected: !k.selected } : k
       )
     );
   };
 
-  const removeKeyword = (id: string) => {
-    setKeywords(prev => prev.filter(k => k.id !== id));
+  const handleGenerate = () => {
+    if (keywords.some(k => k.selected)) {
+      onGenerate(keywords);
+    }
   };
 
-  const handleGenerate = () => {
-    const selectedKeywords = keywords.filter(k => k.selected);
-    if (selectedKeywords.length === 0) {
-      setError('请至少选择一个关键词');
-      return;
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
     }
-    onGenerate(selectedKeywords);
-  };
+  }, []);
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-4">
-      <div className="relative">
-        <Input
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={handleInputKeyDown}
-          onBlur={addKeyword}
-          placeholder="输入关键词后按回车、空格或逗号添加（最多10个）"
-          error={error}
-          disabled={isGenerating}
-        />
+    <div className="space-y-4">
+      <div className="space-y-3">
+        {/* 输入框 */}
+        <div className="relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleInputKeyDown}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => setIsComposing(false)}
+            placeholder="输入关键词后按回车、空格或逗号添加（最多10个）"
+            className="input w-full"
+            disabled={keywords.length >= 10 || isGenerating}
+          />
+        </div>
+
+        {/* 关键词列表 */}
+        {keywords.length > 0 && (
+          <div className="bg-muted/50 rounded-lg p-3">
+            <div className="flex flex-wrap gap-2">
+              {keywords.map(({ text, selected }) => (
+                <KeywordTag
+                  key={text}
+                  text={text}
+                  selected={selected}
+                  onRemove={() => removeKeyword(text)}
+                  onToggle={() => toggleKeyword(text)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {keywords.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {keywords.map(keyword => (
-            <KeywordTag
-              key={keyword.id}
-              keyword={keyword}
-              onToggle={toggleKeyword}
-              onRemove={removeKeyword}
-            />
-          ))}
-        </div>
-      )}
-
-      <div className="flex justify-center">
-        <Button
+      <div className="flex justify-end">
+        <button
           onClick={handleGenerate}
-          disabled={keywords.length === 0 || !keywords.some(k => k.selected)}
-          loading={isGenerating}
-          size="lg"
+          disabled={!keywords.some(k => k.selected) || isGenerating}
+          className={cn(
+            "button button-primary",
+            isGenerating && "opacity-50 cursor-not-allowed"
+          )}
         >
-          生成日报
-        </Button>
+          {isGenerating ? '生成中...' : '生成日报'}
+        </button>
       </div>
     </div>
   );
-}; 
+} 

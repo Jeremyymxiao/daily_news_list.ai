@@ -1,52 +1,52 @@
-import { Keyword } from '@/types';
+'use client';
+
 import { cn } from '@/lib/utils';
 
-interface KeywordTagProps {
-  keyword: Keyword;
-  onToggle: (id: string) => void;
-  onRemove: (id: string) => void;
+interface Props {
+  text: string;
+  selected: boolean;
+  onRemove: () => void;
+  onToggle: () => void;
 }
 
-export const KeywordTag = ({ keyword, onToggle, onRemove }: KeywordTagProps) => {
+export function KeywordTag({ text, selected, onRemove, onToggle }: Props) {
   return (
     <div
       className={cn(
-        'group inline-flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200',
-        'text-sm font-medium',
-        keyword.selected
-          ? 'bg-black text-white border-black'
-          : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+        "inline-flex items-center gap-1 px-2 py-1 rounded-md text-sm transition-colors cursor-pointer",
+        selected
+          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+          : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
       )}
+      onClick={onToggle}
     >
-      <input
-        type="checkbox"
-        checked={keyword.selected}
-        onChange={() => onToggle(keyword.id)}
-        className="w-4 h-4 rounded-sm border-gray-300 text-black focus:ring-black"
-      />
-      <span>{keyword.text}</span>
+      <span>{text}</span>
       <button
-        onClick={() => onRemove(keyword.id)}
-        className={cn(
-          'opacity-0 group-hover:opacity-100 transition-opacity duration-200',
-          'ml-1 p-0.5 rounded-full hover:bg-black/10',
-          keyword.selected && 'hover:bg-white/10'
-        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="ml-1 hover:text-white/80"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
+        <XIcon className="w-3 h-3" />
       </button>
     </div>
   );
-}; 
+}
+
+const XIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="none"
+    height="24"
+    stroke="currentColor"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    strokeWidth="2"
+    viewBox="0 0 24 24"
+    width="24"
+  >
+    <path d="M18 6L6 18" />
+    <path d="M6 6l12 12" />
+  </svg>
+); 

@@ -1,27 +1,33 @@
-import { Button } from '../ui/Button';
+'use client';
 
-interface SettingsProps {
+import { cn } from '@/lib/utils';
+
+interface Props {
   language: 'zh' | 'en';
-  onLanguageChange: (lang: 'zh' | 'en') => void;
+  onLanguageChange: (language: 'zh' | 'en') => void;
 }
 
-export const Settings = ({ language, onLanguageChange }: SettingsProps) => {
+export function Settings({ language, onLanguageChange }: Props) {
   return (
-    <div className="fixed top-4 right-4 flex items-center gap-2">
-      <Button
-        variant={language === 'zh' ? 'primary' : 'secondary'}
-        size="sm"
+    <div className="fixed top-4 right-4 flex gap-2">
+      <button
         onClick={() => onLanguageChange('zh')}
+        className={cn(
+          "button button-secondary h-8 px-3",
+          language === 'zh' && "bg-primary text-primary-foreground hover:bg-primary/90"
+        )}
       >
         中文
-      </Button>
-      <Button
-        variant={language === 'en' ? 'primary' : 'secondary'}
-        size="sm"
+      </button>
+      <button
         onClick={() => onLanguageChange('en')}
+        className={cn(
+          "button button-secondary h-8 px-3",
+          language === 'en' && "bg-primary text-primary-foreground hover:bg-primary/90"
+        )}
       >
         English
-      </Button>
+      </button>
     </div>
   );
-}; 
+} 
